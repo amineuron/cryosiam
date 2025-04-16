@@ -3,7 +3,6 @@ import yaml
 import h5py
 import numpy as np
 import pandas as pd
-from monai.data import ITKReader
 from skimage.measure import label, regionprops_table
 
 from cryosiam.utils import parser_helper

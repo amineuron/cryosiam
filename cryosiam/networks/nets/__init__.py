@@ -1,3 +1,4 @@
+from .simsiam import SimSiam
 from .cnn_head import CNNHead
 from .fpn_decoder import FPNDecoder
 from .bifpn_decoder import BiFPNDecoder
