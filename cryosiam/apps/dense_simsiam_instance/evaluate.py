@@ -1,0 +1,223 @@
+import os
+import yaml
+import h5py
+import torch
+import pickle
+import numpy as np
+import pandas as pd
+from torch.nn import Sigmoid
+from skimage.transform import resize
+from torch.utils.data import DataLoader
+from skimage.measure import regionprops_table
+from skimage.segmentation import watershed, expand_labels
+from monai.data import Dataset, list_data_collate, GridPatchDataset, ITKReader, NumpyReader
+from monai.transforms import (
+    Compose,
+    LoadImaged,
+    EnsureType,
+    EnsureTyped,
+    SpatialPad,
+    NormalizeIntensityd,
+    EnsureChannelFirstd,
+    ScaleIntensityRanged
+)
+
+from cryosiam.utils import parser_helper
+from cryosiam.metrics import AveragePrecision
+from cryosiam.data import MrcReader, PatchIter
+from cryosiam.apps.dense_simsiam_instance import (
+    load_backbone_model,
+    load_prediction_model,
+    instance_segmentation
+)
+
+
+def filter_instances(instances, min_size, max_size):
+    regions = regionprops_table(instances, properties=['label', 'area'])
+    regions = pd.DataFrame(regions)
+    regions = regions[regions['area'] >= min_size]
+    regions = regions[regions['area'] <= max_size]
+    labels = regions['label'].values
+    instances[np.isin(instances, labels, invert=True)] = 0
+    return instances
+
+
+def main(config_file_path):
+    with open(config_file_path, "r") as ymlfile:
+        cfg = yaml.safe_load(ymlfile)
+
+    if 'trained_model' in cfg and cfg['trained_model'] is not None:
+        checkpoint_path = cfg['trained_model']
+    else:
+        checkpoint_path = os.path.join(cfg['log_dir'], 'model', 'model_best.ckpt')
+    backbone = load_backbone_model(checkpoint_path)
+    prediction_model = load_prediction_model(checkpoint_path)
+
+    checkpoint = torch.load(checkpoint_path)
+    net_config = checkpoint['hyper_parameters']['config']
+
+    test_folder = cfg['data_folder']
+    instance_labels_folder = cfg['instance_labels_folder']
+    prediction_folder = cfg['prediction_folder']
+    mask_folder = cfg['mask_folder'] if 'mask_folder' in cfg and cfg['mask_folder'] else None
+    patch_size = net_config['parameters']['data']['patch_size']
+    spatial_dims = net_config['parameters']['network']['spatial_dims']
+    os.makedirs(prediction_folder, exist_ok=True)
+    files = cfg['test_files']
+    if files is None:
+        files = [x for x in os.listdir(test_folder) if os.path.isfile(os.path.join(test_folder, x))]
+    test_data = []
+    for idx, file in enumerate(files):
+        test_data.append({'image': os.path.join(test_folder, file),
+                          'instances': os.path.join(instance_labels_folder, file),
+                          'file_name': os.path.join(test_folder, file)})
+    reader = MrcReader(read_in_mem=True)
+    transforms = Compose(
+        [
+            LoadImaged(keys=['image', 'instances'], reader=reader),
+            EnsureChannelFirstd(keys=['image', 'instances'], channel_dim='no_channel'),
+            ScaleIntensityRanged(keys=['image'], a_min=cfg['parameters']['data']['min'],
+                                 a_max=cfg['parameters']['data']['max'], b_min=0, b_max=1, clip=True),
+            NormalizeIntensityd(keys='image', subtrahend=cfg['parameters']['data']['mean'],
+                                divisor=cfg['parameters']['data']['std']),
+            EnsureTyped(keys=['image'], dtype=torch.float32),
+            EnsureTyped(keys=['instances'], dtype=torch.long)
+        ]
+    )
+
+    if spatial_dims == 2:
+        patch_iter = PatchIter(patch_size=tuple(patch_size), start_pos=(0, 0), overlap=(0, 0.5, 0.5))
+    else:
+        patch_iter = PatchIter(patch_size=tuple(patch_size), start_pos=(0, 0, 0), overlap=(0, 0.5, 0.5, 0.5))
+
+    test_dataset = Dataset(data=test_data, transform=transforms)
+    test_loader = DataLoader(test_dataset, batch_size=1, num_workers=1, collate_fn=list_data_collate)
+    post_pred = Compose([EnsureType('numpy', dtype=np.float32, device=torch.device('cpu'))])
+    pad_transform = SpatialPad(spatial_size=patch_size, method='end', mode='constant')
+
+    print('Evaluation')
+    min_dist = cfg['parameters']['network']['min_center_distance']
+    max_dist = cfg['parameters']['network']['max_center_distance']
+    postprocessing = cfg['parameters']['network']['postprocessing'] if 'postprocessing' in cfg['parameters'][
+        'network'] else True
+    print(f'Min dist: {min_dist}, Max dist: {max_dist}')
+    average_precision = AveragePrecision()
+    aps = []
+    iou_range = None
+    with torch.no_grad():
+        for i, test_sample in enumerate(test_loader):
+            out_file = os.path.join(prediction_folder, os.path.basename(test_sample['file_name'][0]))
+            gt = test_sample['instances'][0][0].numpy()
+            gt = expand_labels(gt.astype(int), 1)
+            if cfg['eval_skip_prediction']:
+                print(f'Processing tomo {test_sample["file_name"][0]}')
+                filename = os.path.basename(test_sample['file_name'][0]).split(cfg['file_extension'])[0]
+                suffix = f'_instance_preds.h5'
+                with h5py.File(os.path.join(prediction_folder, f"{filename}{suffix}")) as f:
+                    instance_labels = f['instances'][()]
+                # instance_labels = filter_instances(instance_labels, min_size=6000, max_size=60000000000)
+                # gt = filter_instances(gt, min_size=6000, max_size=60000000000)
+                ap, iou = average_precision(input_seg=instance_labels, gt_seg=gt)
+                if iou_range is None:
+                    iou_range = iou
+                print(f'Tomo {test_sample["file_name"][0]}, average precision: {ap}')
+                file = f'{filename}_ious_min-{min_dist}_max-{max_dist}.pkl' if not postprocessing else f'{filename}_ious.pkl'
+                with open(os.path.join(prediction_folder, file), 'wb') as handle:
+                    pickle.dump({'iou_range': iou_range, 'aps': ap}, handle,
+                                pickle.HIGHEST_PROTOCOL)
+                aps.append(ap)
+                continue
+
+            original_size = test_sample['image'][0][0].shape
+            img = pad_transform(test_sample['image'][0])
+            patch_dataset = GridPatchDataset(data=[img], patch_iter=patch_iter)
+            input_size = list(img[0].shape)
+            if not os.path.isfile(out_file.split(cfg['file_extension'])[0] + '_preds.h5'):
+                foreground_out = np.zeros(input_size, dtype=np.float32)
+                distances_out = np.zeros(input_size, dtype=np.float32)
+                boundaries_out = np.zeros(input_size, dtype=np.float32)
+                loader = DataLoader(patch_dataset, batch_size=cfg['hyper_parameters']['batch_size'], num_workers=2)
+                print(f'Predicting for tomo {test_sample["file_name"][0]}')
+                for item in loader:
+                    img, coord = item[0], item[1].numpy().astype(int)
+                    z, _ = backbone.forward_predict(img.cuda())
+                    foreground_pred, distance_pred, boundaries_pred = prediction_model(z)
+                    foreground_pred = Sigmoid()(foreground_pred)
+                    boundaries_pred = Sigmoid()(boundaries_pred)
+
+                    foreground_pred, distance_pred, boundaries_pred = post_pred(foreground_pred), \
+                        post_pred(distance_pred), post_pred(boundaries_pred)
+
+                    for batch_i in range(img.shape[0]):
+                        c_batch = coord[batch_i][1:]
+                        f_batch = foreground_pred[batch_i][0]
+                        d_batch = distance_pred[batch_i][0]
+                        b_batch = boundaries_pred[batch_i][0]
+                        # avoid getting patch that is outside of the original dimensions of the image
+                        if c_batch[0][0] >= input_size[0] - patch_size[0] // 4 or \
+                                c_batch[1][0] >= input_size[1] - patch_size[1] // 4 or \
+                                (spatial_dims == 3 and c_batch[2][0] >= input_size[2] - patch_size[2] // 4):
+                            continue
+                        # create slices for the coordinates in the output to get only the middle of the patch
+                        # and the separate cases for the first and last patch in each dimension
+                        slices = tuple(
+                            slice(c[0], c[1] - p // 4) if c[0] == 0 else slice(c[0] + p // 4, c[1])
+                            if c[1] >= s else slice(c[0] + p // 4, c[1] - p // 4)
+                            for c, s, p in zip(c_batch, input_size, patch_size))
+                        # create slices to crop the patch so we only get the middle information
+                        # and the separate cases for the first and last patch in each dimension
+                        slices2 = tuple(
+                            slice(0, 3 * p // 4) if c[0] == 0 else slice(p // 4, p - (c[1] - s))
+                            if c[1] >= s else slice(p // 4, 3 * p // 4)
+                            for c, s, p in zip(c_batch, input_size, patch_size))
+                        foreground_out[slices] = f_batch[slices2]
+                        distances_out[slices] = d_batch[slices2]
+                        boundaries_out[slices] = b_batch[slices2]
+
+                foreground_out = foreground_out[tuple([slice(0, n) for n in original_size])]
+                distances_out = distances_out[tuple([slice(0, n) for n in original_size])]
+                boundaries_out = boundaries_out[tuple([slice(0, n) for n in original_size])]
+                if mask_folder:
+                    filename = os.path.basename(test_sample['file_name'][0]).split(cfg['file_extension'])[
+                                   0] + '_preds.h5'
+                    with h5py.File(os.path.join(mask_folder, filename), 'r') as f:
+                        mask = f['labels'][()].astype(np.int8)
+                    if mask.shape != input_size:
+                        mask = resize(mask, input_size, mode='constant', preserve_range=True).astype(np.int8)
+                    foreground_out = foreground_out * mask
+                    distances_out = distances_out * mask
+                    boundaries_out = boundaries_out * mask
+            else:
+                with h5py.File(out_file.split(cfg['file_extension'])[0] + '_preds.h5', 'r') as f:
+                    foreground_out = f['foreground'][()]
+                    distances_out = f['distances'][()]
+                    boundaries_out = f['boundaries'][()]
+
+            min_dist = cfg['parameters']['network']['min_center_distance']
+            max_dist = cfg['parameters']['network']['max_center_distance']
+            postprocessing = cfg['parameters']['network']['postprocessing'] if 'postprocessing' in cfg['parameters'][
+                'network'] else True
+            instance_labels = instance_segmentation(foreground_out, distances_out, boundaries_out,
+                                                    threshold_min=min_dist, threshold_max=max_dist,
+                                                    boundary_bias=cfg['parameters']['network']['boundary_bias'],
+                                                    assignment_threshold=cfg['parameters']['network'][
+                                                        'threshold_foreground'],
+                                                    distance_type=cfg['parameters']['network']['distance_type'],
+                                                    postprocessing=postprocessing)
+
+            ap, iou = average_precision(input_seg=instance_labels, gt_seg=gt)
+            if iou_range is None:
+                iou_range = iou
+            aps.append(ap)
+
+    print('IOU ranges: ', iou_range)
+    print('mAPs: ', np.mean(aps, axis=0).tolist())
+    file = f'ious_min-{min_dist}_max-{max_dist}.pkl' if not postprocessing else f'ious.pkl'
+    with open(os.path.join(prediction_folder, file), 'wb') as handle:
+        pickle.dump({'iou_range': iou_range, 'aps': np.mean(aps, axis=0).tolist()}, handle, pickle.HIGHEST_PROTOCOL)
+
+
+if __name__ == "__main__":
+    parser = parser_helper()
+    args = parser.parse_args()
+    main(args.config_file)

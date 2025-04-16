@@ -1,0 +1,59 @@
+data_folder: '/g/zaugg/stojanov/simulated_datasets/experiments/dense_simsiam_regression/predictions/'
+labels_folder: '/g/mahamid/stojanov/simulated_datasets/simulated_data/tomograms/instance_full_refined/'
+patches_folder: '/scratch/stojanov/simulated_datasets/final_models/dense_simsiam_instance/patches_denoised'
+temp_dir: '/scratch/stojanov/simulated_datasets/final_models/dense_simsiam_instance'
+log_dir: '/g/zaugg/stojanov/simulated_datasets/final_models/dense_simsiam_instance'
+prediction_folder: '/g/zaugg/stojanov/simulated_datasets/final_models/dense_simsiam_instance/predictions'
+pretrained_model: '/g/zaugg/stojanov/simulated_datasets/experiments/dense_simsiam/version_1/model/last.ckpt'
+file_extension: '.mrc'
+
+train_files: ['sample_1.mrc', 'sample_2.mrc', 'sample_3.mrc', 'sample_4.mrc', 'sample_5.mrc',
+              'sample_6.mrc', 'sample_7.mrc', 'sample_8.mrc', 'sample_9.mrc', 'sample_10.mrc']
+test_files: null
+
+val_files: null
+validation_ratio: 0.1
+
+continue_training: False
+
+parameters:
+  nodes: 1
+  gpu_devices: 8
+  data:
+    patch_size: [ 128, 128, 128 ]
+    patch_overlap: 0.1
+    min: 0
+    max: 1
+    mean: 0
+    std:  1
+  transforms:
+    low_pass_sigma_range: [ 0.5, 2 ]
+    high_pass_sigma_range: [ 0.1, 0.5 ]
+    high_pass_sigma2_range: [ 4, 5 ]
+    noise_sigma_range: [ 0.1, 0.5 ]
+    zoom: [ 0.6, 1 ]
+    combine_transforms: True
+    use_noisy_input: False
+    scale_intensity_factors: null
+  network:
+    in_channels: 1
+    spatial_dims: 3
+    out_channels: 5
+    dense_dim: 64
+    filters: [ 32, 64 ]
+    kernel_size: 3
+    padding: 1
+    threshold: 0.5
+    distance_prediction: True
+    unfreeze_decoder: True
+    unfreeze_backbone: False
+
+hyper_parameters:
+  cache_rate: 0
+  val_interval: 1
+  batch_size: 5
+  optimizer: 'adamw' # one of 'sgd', 'adam', 'adamw'
+  lr: 0.001
+  momentum: 0.9
+  weight_decay: 0.00001
+  max_epochs: 200

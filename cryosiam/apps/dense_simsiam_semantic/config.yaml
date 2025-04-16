@@ -1,4 +1,4 @@
-data_folder: '/g/zaugg/stojanov/simulated_datasets/final_models/dense_simsiam_regression/version_6/predictions/'
+data_folder: '/g/zaugg/stojanov/simulated_datasets/final_models/dense_simsiam_regression/predictions/'
 labels_folder: '/g/mahamid/stojanov/simulated_datasets/simulated_data/tomograms/semantic_gt_for_training'
 patches_folder: '/scratch/stojanov/simulated_datasets/final_models/dense_simsiam_semantic_complexes/patches_denoised_128'
 temp_dir: '/scratch/stojanov/simulated_datasets/final_models/dense_simsiam_semantic_complexes'
