@@ -1,0 +1,27 @@
+data_folder: '/scratch/cryosiam/tomograms/'
+prediction_folder: '/scratch/cryosiam/experiments/dense_simsiam_semantic/predictions'
+trained_model: '/scratch/cryosiam/experiments/dense_simsiam_semantic/model/model-best.ckpt'
+file_extension: '.mrc'
+
+test_files: [ 'TS_56_6.80Apx.mrc', 'TS_61_6.80Apx.mrc' ]
+
+save_internal_files: False
+save_original_file_extension: False
+
+parameters:
+  gpu_devices: 1
+  data:
+    patch_size: [ 128, 128, 128 ]
+    min: 0
+    max: 1
+    mean: 0
+    std: 1
+  network:
+    in_channels: 1
+    spatial_dims: 3
+    out_channels: 1
+    postprocessing: True
+    postprocessing_sizes: [ -1, 10000, -1, -1, -1 ]
+
+hyper_parameters:
+  batch_size: 5

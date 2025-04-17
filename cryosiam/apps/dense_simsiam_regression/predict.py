@@ -21,7 +21,7 @@ from cryosiam.data import MrcReader, PatchIter, MrcWriter
 from cryosiam.apps.dense_simsiam_regression import load_backbone_model, load_prediction_model
 
 
-def main(config_file_path):
+def main(config_file_path,filename):
     with open(config_file_path, "r") as ymlfile:
         cfg = yaml.safe_load(ymlfile)
 
@@ -41,17 +41,24 @@ def main(config_file_path):
     patch_size = net_config['parameters']['data']['patch_size']
     spatial_dims = net_config['parameters']['network']['spatial_dims']
     os.makedirs(prediction_folder, exist_ok=True)
-    files = cfg['test_files']
-    if files is None:
-        files = [x for x in os.listdir(test_folder) if os.path.isfile(os.path.join(test_folder, x))]
+    if filename:
+        files = [filename]
+    else:
+        files = cfg['test_files']
+        if files is None:
+            files = [x for x in os.listdir(test_folder) if os.path.isfile(os.path.join(test_folder, x)) and
+                     x.endswith(cfg['file_extension'])]
     test_data = []
     for idx, file in enumerate(files):
         test_data.append({'image': os.path.join(test_folder, file),
                           'file_name': os.path.join(test_folder, file)})
     reader = MrcReader(read_in_mem=True)
 
-    writer = MrcWriter(output_dtype=np.float32, overwrite=True)
-    writer.set_metadata({'voxel_size': 1})
+    if cfg['file_extension'] in ['.mrc', '.rec']:
+        writer = MrcWriter(output_dtype=np.float32, overwrite=True)
+        writer.set_metadata({'voxel_size': 1})
+    else:
+        writer = ITKWriter()
 
     transforms = Compose(
         [
@@ -59,7 +66,6 @@ def main(config_file_path):
             EnsureChannelFirstd(keys='image'),
             ScaleIntensityRanged(keys='image', a_min=cfg['parameters']['data']['min'],
                                  a_max=cfg['parameters']['data']['max'], b_min=0, b_max=1, clip=True),
-            SpatialPadd(keys='image', spatial_size=patch_size),
             NormalizeIntensityd(keys='image', subtrahend=cfg['parameters']['data']['mean'],
                                 divisor=cfg['parameters']['data']['std']),
             EnsureTyped(keys='image', data_type='tensor')
@@ -70,6 +76,7 @@ def main(config_file_path):
     else:
         patch_iter = PatchIter(patch_size=tuple(patch_size), start_pos=(0, 0, 0), overlap=(0, 0.5, 0.5, 0.5))
     post_pred = Compose([EnsureType('numpy', dtype=np.float32, device=torch.device('cpu'))])
+    pad_transform = SpatialPad(spatial_size=patch_size, method='end', mode='constant')
 
     test_dataset = Dataset(data=test_data, transform=transforms)
     test_loader = DataLoader(test_dataset, batch_size=1, num_workers=1, collate_fn=list_data_collate)
@@ -78,9 +85,10 @@ def main(config_file_path):
     with torch.no_grad():
         for i, test_sample in enumerate(test_loader):
             out_file = os.path.join(prediction_folder, os.path.basename(test_sample['file_name'][0]))
-            patch_dataset = GridPatchDataset(data=[test_sample['image'][0]],
-                                             patch_iter=patch_iter)
-            input_size = list(test_sample['image'][0][0].shape)
+            original_size = test_sample['image'][0][0].shape
+            img = pad_transform(test_sample['image'][0])
+            patch_dataset = GridPatchDataset(data=[img], patch_iter=patch_iter)
+            input_size = list(img[0].shape)
             preds_out = np.zeros([num_output_channels] + input_size, dtype=np.float32)
             loader = DataLoader(patch_dataset, batch_size=cfg['hyper_parameters']['batch_size'], num_workers=2)
             for item in loader:
@@ -111,11 +119,14 @@ def main(config_file_path):
                     preds_out[(slice(0, num_output_channels),) + slices] = o_batch[(slice(0, num_output_channels),)
                                                                                    + slices2]
 
+            preds_out = preds_out[(slice(0, num_output_channels), ) + tuple([slice(0, n) for n in original_size])]
+
             if cfg['scale_prediction']:
                 preds_out = (preds_out - preds_out.min()) / (preds_out.max() - preds_out.min())
 
-            with h5py.File(out_file.split(cfg['file_extension'])[0] + '_preds.h5', 'w') as f:
-                f.create_dataset('preds', data=preds_out)
+            if cfg['save_raw_predictions']:
+                with h5py.File(out_file.split(cfg['file_extension'])[0] + '_preds.h5', 'w') as f:
+                    f.create_dataset('preds', data=preds_out)
 
             writer.set_data_array(preds_out[0], channel_dim=None)
             writer.write(out_file.split(cfg['file_extension'])[0] + f'{cfg["file_extension"]}')
@@ -124,4 +135,4 @@ def main(config_file_path):
 if __name__ == "__main__":
     parser = parser_helper()
     args = parser.parse_args()
-    main(args.config_file)
+    main(args.config_file, args.filename)

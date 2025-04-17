@@ -28,10 +28,7 @@ def main(config_file_path, filename):
     with open(config_file_path, "r") as ymlfile:
         cfg = yaml.safe_load(ymlfile)
 
-    if 'trained_model' in cfg and cfg['trained_model'] is not None:
-        checkpoint_path = cfg['trained_model']
-    else:
-        checkpoint_path = os.path.join(cfg['log_dir'], 'model', 'model_best.ckpt')
+    checkpoint_path = cfg['trained_model']
     backbone = load_backbone_model(checkpoint_path)
     prediction_model = load_prediction_model(checkpoint_path)
 
@@ -169,7 +166,7 @@ def main(config_file_path, filename):
             else:
                 if 'save_original_file_extension' in cfg and cfg['save_original_file_extension']:
                     writer.set_data_array(labels_out.astype(np.uint8), channel_dim=None)
-                    writer.write(out_file.split(cfg['file_extension'])[0] + f'{cfg["file_extension"]}')
+                    writer.write(out_file.split(cfg['file_extension'])[0] + f'_preds{cfg["file_extension"]}')
                 else:
                     with h5py.File(out_file.split(cfg['file_extension'])[0] + '_preds.h5', 'w') as f:
                         f.create_dataset('labels', data=labels_out.astype(np.uint8))
