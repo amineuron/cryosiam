@@ -3,6 +3,7 @@ from cryosiam.apps.dense_simsiam_regression.predict import main as denoise_predi
 from cryosiam.apps.dense_simsiam_semantic.predict import main as semantic_predict_main
 from cryosiam.apps.dense_simsiam_instance.predict import main as instance_predict_main
 from cryosiam.apps.preprocessing.revert_and_scale_intensity import main as preprocessing
+from cryosiam.apps.dense_simsiam_semantic.prediction_postprocessing import main as semantic_postprocessing
 
 __version__ = "0.1.0"
 
@@ -33,6 +34,13 @@ def main():
     sp_semantic.add_argument('--filename', type=str, required=False,
                              help='Process only this specific tomogram filename', default=None)
     sp_semantic.set_defaults(func=lambda args: instance_predict_main(args.config_file, args.filename))
+
+    # semantic_postprocessing subcommand
+    sp_semantic = subparsers.add_parser("semantic_postprocessing", help="Run semantic segmentation postprocessing")
+    sp_semantic.add_argument('--config_file', type=str, required=True, help='Path to the .yaml configuration file')
+    sp_semantic.add_argument('--filename', type=str, required=False,
+                             help='Process only this specific tomogram filename', default=None)
+    sp_semantic.set_defaults(func=lambda args: semantic_postprocessing(args.config_file, args.filename))
 
     args = parser.parse_args()
 

@@ -3,7 +3,7 @@ import yaml
 import h5py
 import torch
 import numpy as np
-from skimage.transform import resize
+from skimage.transform import resize, pyramid_reduce, pyramid_expand
 from torch.nn import Softmax, Sigmoid
 from torch.utils.data import DataLoader
 from skimage.morphology import convex_hull_image
@@ -39,8 +39,7 @@ def main(config_file_path, filename):
     prediction_folder = cfg['prediction_folder']
     mask_folder = cfg['mask_folder'] if 'mask_folder' in cfg and cfg['mask_folder'] else None
     num_classes = net_config['parameters']['network']['out_channels']
-    if num_classes == 1:
-        threshold = cfg['parameters']['network']['threshold']
+    threshold = cfg['parameters']['network']['threshold']
     patch_size = net_config['parameters']['data']['patch_size']
     spatial_dims = net_config['parameters']['network']['spatial_dims']
     os.makedirs(prediction_folder, exist_ok=True)
@@ -132,6 +131,7 @@ def main(config_file_path, filename):
                     if num_classes == 1:
                         o_batch = (np.squeeze(o_batch, axis=0) > threshold).astype(np.uint32)  # (D, H, W)
                     else:
+                        o_batch[o_batch < threshold] = 0
                         o_batch = np.argmax(o_batch, axis=0)  # (B, D, H, W)
                     labels_out[slices] = o_batch[slices2]
 
@@ -153,7 +153,13 @@ def main(config_file_path, filename):
                 largest_cc = get_largest_cc(probs_out[0], threshold)
                 if '3d_postprocessing' in cfg['parameters']['network'] and cfg['parameters']['network'][
                     '3d_postprocessing']:
+                    size = largest_cc.shape
+                    largest_cc = pyramid_reduce(largest_cc, 4, preserve_range=True)
                     labels_out = convex_hull_image(largest_cc)
+                    if spatial_dims == 3:
+                        labels_out = pyramid_expand(labels_out, 4, preserve_range=True)[:size[0], :size[1], :size[2]].astype(int)
+                    else:
+                        labels_out = pyramid_expand(labels_out, 4, preserve_range=True)[:size[0], :size[1]].astype(int)
                 else:
                     for ind in range(largest_cc.shape[0]):
                         labels_out[ind] = convex_hull_image(largest_cc[ind])
@@ -166,7 +172,7 @@ def main(config_file_path, filename):
             else:
                 if 'save_original_file_extension' in cfg and cfg['save_original_file_extension']:
                     writer.set_data_array(labels_out.astype(np.uint8), channel_dim=None)
-                    writer.write(out_file.split(cfg['file_extension'])[0] + f'_preds{cfg["file_extension"]}')
+                    writer.write(out_file)
                 else:
                     with h5py.File(out_file.split(cfg['file_extension'])[0] + '_preds.h5', 'w') as f:
                         f.create_dataset('labels', data=labels_out.astype(np.uint8))
