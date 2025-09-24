@@ -83,6 +83,7 @@ class MrcReader(ImageReader):
             header = {name: header[name] for name in header.dtype.names if name in important_info}
             header['voxel_size'] = np.asarray((img.voxel_size['x'], img.voxel_size['y'], img.voxel_size['z']))
             data = i.data[:]
+            data.setflags(write=True)
             img_array.append(data)
             if self.channel_dim is None:  # default to "no_channel" or -1
                 header["original_channel_dim"] = "no_channel"

@@ -5,6 +5,7 @@ semantic_foreground_labels: [ 2 ]
 mask_folder: ''
 log_dir: '/scratch/stojanov/development/cryosiam/experiments/dense_simsiam_instance'
 prediction_folder: '/scratch/stojanov/development/cryosiam/experiments/dense_simsiam_instance/predictions'
+filtering_mask_folder: '/g/zaugg/stojanov/simulated_datasets/final_models/dense_simsiam_instance/predictions/semantic'
 trained_model: '/scratch/stojanov/development/cryosiam/experiments/dense_simsiam_instance/model/model-best.ckpt'
 file_extension: '.mrc'
 

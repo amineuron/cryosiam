@@ -31,6 +31,7 @@ setup(
         "scikit_learn==1.3.2",
         "scipy==1.9.1",
         "scikit-image==0.20.0",
+        "edt==2.4.1",
         "torch==2.1.2",
         "torchvision==0.16.2",
         "umap-learn==0.5.7"

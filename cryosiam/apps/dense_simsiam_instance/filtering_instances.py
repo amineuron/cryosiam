@@ -15,7 +15,7 @@ def main(config_file_path, filename=None):
 
     test_folder = cfg['data_folder']
     prediction_folder = cfg['prediction_folder']
-    semantic_predictions = cfg['semantic_predictions'] if 'semantic_predictions' in cfg else None
+    semantic_mask = cfg['filtering_mask_folder']
     os.makedirs(prediction_folder + '_filtered', exist_ok=True)
     files = cfg['test_files']
     if files is None:
@@ -39,7 +39,7 @@ def main(config_file_path, filename=None):
         with h5py.File(out_file.split(cfg['file_extension'])[0] + '_instance_preds.h5', 'r') as f:
             instances = f['instances'][()]
 
-        file_path = os.path.join(semantic_predictions, os.path.basename(test_sample['file_name'][0]))
+        file_path = os.path.join(semantic_mask, os.path.basename(test_sample['file_name'][0]))
         with h5py.File(file_path.split(cfg['file_extension'])[0] + '_preds.h5', 'r') as f:
             semantic = f['labels'][()]
 
