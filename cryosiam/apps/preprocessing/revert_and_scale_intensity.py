@@ -13,14 +13,11 @@ def scale_tomogram(tomo, percentile_lower=None, percentile_upper=None):
         min_val = np.percentile(tomo, percentile_lower)
     else:
         min_val = tomo.min()
-
     if percentile_upper:
         max_val = np.percentile(tomo, percentile_upper)
     else:
         max_val = tomo.max()
-
     tomo = (tomo - min_val) / (max_val - min_val)
-
     return np.clip(tomo, 0, 1)
 
 def main(input_path, output_path, invert, lower_end_percentage, upper_end_percentage):

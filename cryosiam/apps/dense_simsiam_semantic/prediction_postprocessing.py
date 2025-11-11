@@ -54,11 +54,8 @@ def main(config_file_path, filename=None):
         else:
             filename = os.path.join(prediction_folder, f"{file.split(cfg['file_extension'])[0]}_preds.mrc")
             labels_out = reader.read(filename)
-            if cfg['file_extension'] in ['.mrc', '.rec']:
-                labels_out = labels_out.data
-                labels_out.setflags(write=True)
-            else:
-                labels_out = labels_out[0]
+            labels_out = labels_out.data
+            labels_out.setflags(write=True)
             labels_out = postprocessing_labels(labels_out,
                                                cfg['parameters']['network']['postprocessing_sizes']).astype(np.uint8)
             writer.set_data_array(labels_out, channel_dim=None)
