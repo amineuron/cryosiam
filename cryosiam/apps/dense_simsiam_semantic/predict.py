@@ -32,7 +32,7 @@ def main(config_file_path, filename):
     backbone = load_backbone_model(checkpoint_path)
     prediction_model = load_prediction_model(checkpoint_path)
 
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, weights_only=False)
     net_config = checkpoint['hyper_parameters']['config']
 
     test_folder = cfg['data_folder']
