@@ -17,6 +17,12 @@ from cryosiam.apps.dense_simsiam_semantic.preprocess_segmentation_maps import ma
 from cryosiam.apps.dense_simsiam_semantic.create_patches import main as semantic_train_create_patches
 from cryosiam.apps.dense_simsiam_semantic.train import main as semantic_train
 
+from cryosiam.apps.processing.invert_and_scale_intensity import main as invert_and_scale_intensity_main
+from cryosiam.apps.processing.create_sphere_mask_from_coordinates import \
+    main as create_sphere_mask_from_coordinates_main
+from cryosiam.apps.processing.create_sphere_mask_from_coordinates_multiclass import \
+    main as create_sphere_mask_from_coordinates_multiclass_main
+
 __version__ = "1.0"
 
 
@@ -102,7 +108,7 @@ def main():
     sp_semantic.set_defaults(func=lambda args: semantic_filter_ground_truth(args.config_file))
 
     sp_semantic = subparsers.add_parser("semantic_train_preprocess",
-                                        help="Run preprocessing of the data for semantic segmentation training")
+                                        help="Run processing of the data for semantic segmentation training")
     sp_semantic.add_argument('--config_file', type=str, required=True, help='Path to the .yaml configuration file')
     sp_semantic.set_defaults(func=lambda args: semantic_train_preprocess(args.config_file))
 
@@ -114,6 +120,67 @@ def main():
     sp_semantic = subparsers.add_parser("semantic_train", help="Run semantic segmentation training")
     sp_semantic.add_argument('--config_file', type=str, required=True, help='Path to the .yaml configuration file')
     sp_semantic.set_defaults(func=lambda args: semantic_train(args.config_file))
+
+    ############# Processing commands #############
+    # Invert and scale command
+    sp_process = subparsers.add_parser("processing_invert_scale",
+                                       help="Run invert and/or scale of the given tomogram/s intensities")
+    sp_process.add_argument('--input_path', type=str, required=True, help='path to the input tomogram or '
+                                                                          'path to the folder with input tomogram/s')
+    sp_process.add_argument('--output_path', type=str, required=True, help='path to save the output tomogram or '
+                                                                           'path to folder to save the output tomogram/s')
+    sp_process.add_argument("--invert", action="store_true", default=False, help="Inverts contrast of images.")
+    sp_process.add_argument("--lower_end_percentage", type=float, required=False,
+                            help="Cut off values from the lower percentile end of the intensities.")
+    sp_process.add_argument("--upper_end_percentage", type=float, required=False,
+                            help="Cut off values from the upper percentile end of the intensities.")
+    sp_process.set_defaults(
+        func=lambda args: invert_and_scale_intensity_main(args.input_path, args.output_path, args.invert,
+                                                          args.lower_end_percentage, args.upper_end_percentage))
+
+    # Create binary sphere mask
+    sp_process = subparsers.add_parser("processing_create_sphere_mask",
+                                       help="Create binary tomogram mask with sphere map from given center coordinates")
+    sp_process.add_argument('--coordinates_file', type=str, required=True,
+                            help='path to star file or csv file with X,Y,Z coordinates. The star file needs the '
+                                 '[rlnCoordinateX, rlnCoordinateY, rlnCoordinateZ] header, while the csv file header '
+                                 'should be [centroid-0, centroid-1, centroid-2] for z, y, x order')
+    sp_process.add_argument('--sphere_radius', type=int, required=True,
+                            help='radius in number of pixels for the sphere')
+    sp_process.add_argument('--output_dir', type=str, required=True,
+                            help='path to folder to save the output tomogram/s')
+    sp_process.add_argument('--example_tomogram', type=str, required=True,
+                            help='path to one tomogram to determine the 3D size of the output')
+    sp_process.add_argument('--tomo_name', type=str, required=False,
+                            help='process only this tomogram, the name should match the rlnMicrographName in '
+                                 'the starfile or the tomo in the csv file')
+    sp_process.set_defaults(
+        func=lambda args: create_sphere_mask_from_coordinates_main(args.coordinates_file, args.sphere_radius,
+                                                                   args.output_dir, args.example_tomogram,
+                                                                   args.tomo_name))
+
+    # Create multiclass sphere mask
+    sp_process = subparsers.add_parser("processing_create_sphere_mask_multiclass",
+                                       help="Create binary tomogram mask with sphere map from given center coordinates")
+    sp_process.add_argument('--coordinates_file', type=str, required=True,
+                            help='path to star file or csv file with X,Y,Z coordinates. The star file needs the '
+                                 '[rlnCoordinateX, rlnCoordinateY, rlnCoordinateZ, rlnClassNumber] header, while the '
+                                 'csv file header should be [centroid-0, centroid-1, centroid-2, semantic_class] '
+                                 'for z, y, x order. The class numbers have to start from 1 and to have sequential order.')
+    sp_process.add_argument('--sphere_radius', type=str, required=True,
+                            help='radius in number of pixels for the sphere for different classes. The expected input is '
+                                 'N integers separated by comma, where N is the number of different classes of particles')
+    sp_process.add_argument('--output_dir', type=str, required=True,
+                            help='path to folder to save the output tomogram/s')
+    sp_process.add_argument('--example_tomogram', type=str, required=True,
+                            help='path to one tomogram to determine the 3D size of the output')
+    sp_process.add_argument('--tomo_name', type=str, required=False,
+                            help='process only this tomogram, the name should match the rlnMicrographName in '
+                                 'the starfile or the tomo in the csv file')
+    sp_process.set_defaults(
+        func=lambda args: create_sphere_mask_from_coordinates_multiclass_main(args.coordinates_file, args.sphere_radius,
+                                                                              args.output_dir, args.example_tomogram,
+                                                                              args.tomo_name))
 
     args = parser.parse_args()
     # Run selected command

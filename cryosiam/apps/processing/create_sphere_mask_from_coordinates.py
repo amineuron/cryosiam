@@ -8,7 +8,15 @@ from cryosiam.data import MrcReader, MrcWriter
 
 
 def create_sphere(radius):
-    return ...
+    N = radius * 4
+    x0, y0, z0 = (N // 2, N // 2, N // 2)
+
+    x, y, z = np.mgrid[0:N:1, 0:N:1, 0:N:1]
+    r = - np.sqrt((x - x0) ** 2 + (y - y0) ** 2 + (z - z0) ** 2)
+    r[r < -1 * radius] = np.min(r)
+    r = r.astype(np.float32) - np.min(r)
+    r = (r - r.max()) / (r.max() - r.min())
+    return r
 
 
 def read_csv_file(filename):
@@ -94,7 +102,7 @@ def main(coordinates_file, sphere_radius, output_dir, example_tomogram, tomo_nam
 
 
 def parser_helper(description=None):
-    description = "Create instance map from given average map and orientations" if description is None else description
+    description = "Create binary tomogram mask with sphere map from given center coordinates" if description is None else description
     parser = argparse.ArgumentParser(description, add_help=True,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--coordinates_file', type=str, required=True,

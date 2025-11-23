@@ -1,5 +1,4 @@
 import os
-import mrcfile
 import starfile
 import argparse
 import numpy as np
