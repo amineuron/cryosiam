@@ -20,6 +20,7 @@ def scale_tomogram(tomo, percentile_lower=None, percentile_upper=None):
     tomo = (tomo - min_val) / (max_val - min_val)
     return np.clip(tomo, 0, 1)
 
+
 def main(input_path, output_path, invert, lower_end_percentage, upper_end_percentage):
     if os.path.isdir(input_path):
         os.makedirs(output_path, exist_ok=True)
@@ -31,7 +32,8 @@ def main(input_path, output_path, invert, lower_end_percentage, upper_end_percen
                 if invert:
                     tomogram = invert_tomogram(tomogram)
 
-                tomogram = scale_tomogram(tomogram, lower_end_percentage, upper_end_percentage)
+                if lower_end_percentage:
+                    tomogram = scale_tomogram(tomogram, lower_end_percentage, upper_end_percentage)
 
                 with mrcfile.new(os.path.join(output_path, tomo), overwrite=True) as m:
                     m.set_data(tomogram)
@@ -44,7 +46,8 @@ def main(input_path, output_path, invert, lower_end_percentage, upper_end_percen
         if invert:
             tomogram = invert_tomogram(tomogram)
 
-        tomogram = scale_tomogram(tomogram, lower_end_percentage, upper_end_percentage)
+        if lower_end_percentage:
+            tomogram = scale_tomogram(tomogram, lower_end_percentage, upper_end_percentage)
 
         with mrcfile.new(output_path, overwrite=True) as m:
             m.set_data(tomogram)
@@ -60,9 +63,9 @@ def parser_helper(description=None):
     parser.add_argument('--output_path', type=str, required=True, help='path to save the output tomogram or '
                                                                        'path to folder to save the output tomogram/s')
     parser.add_argument("--invert", action="store_true", default=False, help="Inverts contrast of images.")
-    parser.add_argument("--lower_end_percentage", type=float, required=True, default=0.1,
+    parser.add_argument("--lower_end_percentage", type=float, required=False,
                         help="Cut off values from the lower percentile end of the intensities.")
-    parser.add_argument("--upper_end_percentage", type=float, required=True, default=99.9,
+    parser.add_argument("--upper_end_percentage", type=float, required=False,
                         help="Cut off values from the upper percentile end of the intensities.")
     return parser
 
