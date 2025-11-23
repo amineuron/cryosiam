@@ -72,7 +72,7 @@ def main(coordinates_file, sphere_radiuses, output_dir, example_tomogram, tomo_n
                 current_data_current_class = current_data[current_data['semantic_class'] == class_num]
 
             sphere_radius = sphere_radiuses[class_num - 1]
-            sphere = (create_sphere(radius=sphere_radius) > 0).astype(np.uint8)
+            sphere = (create_sphere(radius=sphere_radius) > -0.5).astype(np.uint8) * class_num
 
             radius = sphere.shape[0] // 2
 

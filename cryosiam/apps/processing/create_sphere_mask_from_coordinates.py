@@ -56,7 +56,7 @@ def main(coordinates_file, sphere_radius, output_dir, example_tomogram, tomo_nam
     tomogram = tomogram.data
     tomogram.setflags(write=True)
 
-    sphere = (create_sphere(radius=sphere_radius) > 0).astype(np.uint8)
+    sphere = (create_sphere(radius=sphere_radius) > -0.5).astype(np.uint8)
 
     radius = sphere.shape[0] // 2
     size = tomogram.shape
