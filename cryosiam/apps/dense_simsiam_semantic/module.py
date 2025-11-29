@@ -189,7 +189,7 @@ class SemanticSegmentationModule(pl.LightningModule):
         image_transforms = [x for x in image_transforms if x is not None]
 
         # define the data transforms
-        train_transforms = Compose([LoadImaged(keys=keys + ['labels'], reader=MrcReader()),
+        train_transforms = Compose([LoadImaged(keys=keys + ['labels'], reader=MrcReader(writable=False)),
                                     LoadImaged(keys=['distances'],
                                                reader=NumpyReader(npz_keys='data', channel_dim=0)),
                                     EnsureChannelFirstd(keys=keys + ['labels'], channel_dim='no_channel'),

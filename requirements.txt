@@ -16,7 +16,6 @@ scipy
 plotly
 PyYAML
 scikit_learn
-scipy
 scikit-image
 starfile
 umap-learn

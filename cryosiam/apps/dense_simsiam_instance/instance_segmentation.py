@@ -6,8 +6,12 @@ from skimage.filters import gaussian
 from skimage.segmentation import relabel_sequential
 from skimage.segmentation import watershed, join_segmentations
 
-import elf.segmentation.multicut as mc
-import elf.segmentation.features as feats
+try:
+    import elf.segmentation.multicut as mc
+    import elf.segmentation.features as feats
+except ImportError:
+    mc = None
+    feats = None
 
 
 def apply_bilateral_filter(image, domain_sigma=1, range_sigma=0.2):

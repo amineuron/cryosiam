@@ -47,7 +47,6 @@ parameters:
     filters: [ 32, 64 ]
     kernel_size: 3
     padding: 1
-    threshold: 0.5
     distance_prediction: True
     use_dice_loss: True
     unfreeze_decoder: True
