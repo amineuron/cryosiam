@@ -26,12 +26,14 @@ class MrcReader(ImageReader):
             channel_dim: Optional[int] = None,
             dtype: DtypeLike = np.float32,
             read_in_mem=False,
+            writable=True,
             **kwargs,
     ):
         super().__init__()
         self.channel_dim = channel_dim
         self.dtype = dtype
         self.read_in_mem = read_in_mem
+        self.writable = writable
         self.kwargs = kwargs
 
     def verify_suffix(self, filename: Union[Sequence[PathLike], PathLike]) -> bool:
@@ -83,7 +85,8 @@ class MrcReader(ImageReader):
             header = {name: header[name] for name in header.dtype.names if name in important_info}
             header['voxel_size'] = np.asarray((img.voxel_size['x'], img.voxel_size['y'], img.voxel_size['z']))
             data = i.data[:]
-            data.setflags(write=True)
+            if self.writable:
+                data.setflags(write=True)
             img_array.append(data)
             if self.channel_dim is None:  # default to "no_channel" or -1
                 header["original_channel_dim"] = "no_channel"

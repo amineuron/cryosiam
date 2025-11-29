@@ -184,7 +184,7 @@ class RegressionModule(pl.LightningModule):
         image_transforms = [x for x in image_transforms if x is not None]
 
         # define the data transforms
-        train_transforms = Compose([LoadImaged(keys=['image', 'gt'], reader=MrcReader()),
+        train_transforms = Compose([LoadImaged(keys=['image', 'gt'], reader=MrcReader(writable=False)),
                                     EnsureChannelFirstd(keys=['image', 'gt'], channel_dim='no_channel'),
                                     ScaleIntensityRanged(keys=['image'], a_min=self.config['parameters']['data']['min'],
                                                          a_max=self.config['parameters']['data']['max'], b_min=0,

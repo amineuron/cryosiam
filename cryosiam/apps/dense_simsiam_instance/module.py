@@ -180,7 +180,7 @@ class InstanceSegmentationModule(pl.LightningModule):
 
         # define the data transforms
         train_transforms = Compose([LoadImaged(keys=keys + ['foreground', 'distances', 'boundaries'],
-                                               reader=MrcReader()),
+                                               reader=MrcReader(writable=False)),
                                     EnsureChannelFirstd(keys=keys + ['foreground', 'distances', 'boundaries'],
                                                         channel_dim='no_channel'),
                                     ClipIntensityd(keys=['distances'], a_min=-5, a_max=5),
