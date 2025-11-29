@@ -32,6 +32,11 @@ def main(config_file_path):
     files = [file for file in os.listdir(cfg['prediction_folder']) if file.endswith('.h5')]
     labels = {i + 1: [] for i in range(cfg['parameters']['network']['out_channels'])}
 
+    if 'min_voxels' in cfg['parameters']['network']:
+        min_voxels = cfg['parameters']['network']['min_voxels']
+    else:
+        min_voxels = 100
+
     for i in range(cfg['parameters']['network']['out_channels']):
         label_id = i + 1
         for file in files:
@@ -42,7 +47,7 @@ def main(config_file_path):
             instances = label(binary_erosion(data == label_id))
             regions = regionprops_table(instances, properties=['label', 'area', 'centroid'])
             regions = pd.DataFrame(regions)
-            regions = regions[regions['area'] > 100]
+            regions = regions[regions['area'] > min_voxels]
             regions['tomo'] = basename
             labels[label_id].append(regions)
 
