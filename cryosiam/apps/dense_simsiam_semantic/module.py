@@ -23,6 +23,7 @@ from monai.transforms import (
     SpatialPadd,
     EnsureTyped,
     RandRotated,
+    Rand3DElasticd,
     RandScaleIntensityd,
     NormalizeIntensityd,
     EnsureChannelFirstd,
@@ -195,12 +196,20 @@ class SemanticSegmentationModule(pl.LightningModule):
                                                reader=NumpyReader(npz_keys='data', channel_dim=0)),
                                     EnsureChannelFirstd(keys=keys + ['labels'], channel_dim='no_channel'),
                                     ClipIntensityd(keys=['distances'], a_min=-5, a_max=5),
+                                    ScaleIntensityRanged(keys=['distances'], a_min=-5, a_max=5,
+                                                         b_min=-1, b_max=1, clip=True),
                                     ScaleIntensityRanged(keys, a_min=self.config['parameters']['data']['min'],
                                                          a_max=self.config['parameters']['data']['max'], b_min=0,
                                                          b_max=1, clip=True),
                                     SpatialPadd(keys=keys + ['labels', 'distances'],
                                                 spatial_size=self.config['parameters']['data']['patch_size']),
                                     OneOf(transforms=image_transforms),
+                                    Rand3DElasticd(keys=keys, prob=0.8,
+                                                   sigma_range=(5, 10),
+                                                   magnitude_range=self.config['parameters']['transforms']['elastic'])
+                                    if 'elastic' in self.config['parameters'][
+                                        'transforms'] and self.config['parameters']['transforms']['elastic']
+                                    else Identityd(keys=['image']),
                                     RandZoomd(keys=keys + ['labels', 'distances'], prob=0.8,
                                               min_zoom=self.config['parameters']['transforms']['zoom'][0],
                                               max_zoom=self.config['parameters']['transforms']['zoom'][1],
@@ -337,6 +346,7 @@ class SemanticSegmentationModule(pl.LightningModule):
             if self.config['parameters']['network']['out_channels'] > 1:
                 labels = torch.unsqueeze(labels, 1)
             labels_loss += self.semantic_loss_function2(labels_pred, labels)
+        distance_pred = nn.Tanh()(distance_pred)
         distances_loss = self.distance_loss_function(distance_pred, distance)
 
         if self.config['parameters']['network']['distance_prediction']:
@@ -364,6 +374,7 @@ class SemanticSegmentationModule(pl.LightningModule):
             if self.config['parameters']['network']['out_channels'] > 1:
                 labels = torch.unsqueeze(labels, 1)
             labels_loss += self.semantic_loss_function2(labels_pred, labels)
+        distance_pred = nn.Tanh()(distance_pred)
         distances_loss = self.distance_loss_function(distance_pred, distance)
 
         if self.config['parameters']['network']['distance_prediction']:

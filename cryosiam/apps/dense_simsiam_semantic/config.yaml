@@ -40,6 +40,7 @@ parameters:
     combine_transforms: True
     use_noisy_input: False
     scale_intensity_factors: null
+    elastic: [5, 10]
     zoom: [0.8, 1.2]
     rotate: [3.14, 3.14, 3.14]
   network:

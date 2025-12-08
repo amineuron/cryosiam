@@ -16,17 +16,12 @@ def main(config_file_path):
     writer_labels = MrcWriter(output_dtype=np.float32, overwrite=True)
     writer_labels.set_metadata({'voxel_size': 1})
 
-    labels_folder = cfg['labels_folder']
+    labels_folder = cfg['labels_folder_for_filtering']
     selected_labels = cfg['selected_labels']
-    filtered_labels_folder = cfg['filtered_labels_folder']
+    filtered_labels_folder = cfg['labels_folder']
 
     os.makedirs(filtered_labels_folder, exist_ok=True)
     files = [x for x in os.listdir(labels_folder) if x.endswith(cfg['file_extension'])]
-
-    if cfg['train_files'] is not None:
-        if cfg['test_files'] is None:
-            cfg['test_files'] = []
-        files = [x for x in files if x in cfg['train_files'] or x in cfg['test_files']]
 
     for file in files:
         print(f'Processing tomo {file}')
