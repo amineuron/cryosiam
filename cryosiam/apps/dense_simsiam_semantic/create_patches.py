@@ -27,6 +27,8 @@ def main(config_file_path):
     temp_dir = cfg['temp_dir']
     patch_size = cfg['parameters']['data']['patch_size']
     overlap = cfg['parameters']['data']['patch_overlap']
+    remove_only_background = 'remove_only_background' in cfg['parameters']['data'] \
+                             and cfg['parameters']['data']['remove_only_background']
 
     os.makedirs(os.path.join(patches_folder, 'image'), exist_ok=True)
     os.makedirs(os.path.join(patches_folder, 'labels'), exist_ok=True)
@@ -69,8 +71,8 @@ def main(config_file_path):
             patch = image[slices].astype(np.float32)
             label_patch = labels[slices].astype(np.float32)
             distance_patch = distances[(slice(dist_shape),) + slices].astype(np.float32)
-            # if np.sum(label_patch) == 0:
-            #     continue
+            if remove_only_background and np.sum(label_patch) == 0:
+                continue
             if len(patch_size) == 2:
                 y, x = coords_array[0][0], coords_array[1][0]
                 patch_path = f'{file.split(cfg["file_extension"])[0]}_y{y}_x{x}{cfg["file_extension"]}'

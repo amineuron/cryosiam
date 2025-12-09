@@ -155,7 +155,7 @@ def main(config_file_path, filename):
                 distances_out = distances_out * mask
 
             if 'postprocessing' in cfg['parameters']['network'] and cfg['parameters']['network']['postprocessing']:
-                print(f'Postprocessing file {current_file}')
+                print(f'Postprocessing for file {current_file}')
                 largest_cc = get_largest_cc(probs_out[0], threshold)
                 if '3d_postprocessing' in cfg['parameters']['network'] and cfg['parameters']['network'][
                     '3d_postprocessing']:

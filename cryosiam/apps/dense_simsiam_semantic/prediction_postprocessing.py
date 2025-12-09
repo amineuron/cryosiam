@@ -45,6 +45,7 @@ def main(config_file_path, filename=None):
     print('Post-processing')
     for file in files:
         filename = os.path.join(prediction_folder, f"{file.split(cfg['file_extension'])[0]}_preds.h5")
+        print(f'Postprocessing for file {filename}')
         if os.path.isfile(filename):
             with h5py.File(filename) as f:
                 labels_out = f['labels'][()]
