@@ -20,6 +20,9 @@ from monai.transforms import (
     LoadImaged,
     SpatialPadd,
     EnsureTyped,
+    RandRotated,
+    RandFlipd,
+    Rand3DElasticd,
     RandScaleIntensityd,
     NormalizeIntensityd,
     EnsureChannelFirstd,
@@ -198,6 +201,32 @@ class RegressionModule(pl.LightningModule):
                                               padding_mode='constant') if 'zoom' in self.config['parameters'][
                                         'transforms'] and self.config['parameters']['transforms'][
                                                                               'zoom'] else Identityd(keys=['image']),
+                                    Rand3DElasticd(keys=['image', 'gt'], prob=0.8,
+                                                   sigma_range=(5, 10),
+                                                   magnitude_range=self.config['parameters']['transforms']['elastic'])
+                                    if 'elastic' in self.config['parameters'][
+                                        'transforms'] and self.config['parameters']['transforms']['elastic']
+                                    else Identityd(keys=['image']),
+                                    RandRotated(keys=['image', 'gt'], prob=0.8,
+                                                range_x=self.config['parameters']['transforms']['rotate'][0],
+                                                range_y=self.config['parameters']['transforms']['rotate'][1],
+                                                range_z=self.config['parameters']['transforms']['rotate'][2],
+                                                padding_mode='zeros')
+                                    if 'rotate' in self.config['parameters'][
+                                        'transforms'] and self.config['parameters']['transforms'][
+                                           'rotate'] else Identityd(keys=['image']),
+                                    RandFlipd(keys=['image', 'gt'], prob=0.8, spatial_axis=-1)
+                                    if 'flip' in self.config['parameters']['transforms'] and
+                                       self.config['parameters']['transforms']['flip'] else
+                                    Identityd(keys=['image']),
+                                    RandFlipd(keys=['image', 'gt'], prob=0.8, spatial_axis=-2)
+                                    if 'flip' in self.config['parameters']['transforms'] and
+                                       self.config['parameters']['transforms']['flip'] else
+                                    Identityd(keys=['image']),
+                                    RandFlipd(keys=['image', 'gt'], prob=0.8, spatial_axis=-3)
+                                    if 'flip' in self.config['parameters']['transforms'] and
+                                       self.config['parameters']['transforms']['flip'] else
+                                    Identityd(keys=['image']),
                                     RandScaleIntensityd(['image'], prob=0.8,
                                                         factors=self.config['parameters']['transforms'][
                                                             'scale_intensity_factors'])
