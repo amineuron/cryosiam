@@ -32,6 +32,10 @@ parameters:
     noise_sigma_range: null
     combine_transforms: False
     scale_intensity_factors: null
+    elastic: [ 5, 10 ]
+    zoom: [ 0.8, 1.2 ]
+    rotate: [ 3.14, 3.14, 3.14 ]
+    flip: True
   network:
     in_channels: 1
     spatial_dims: 3
